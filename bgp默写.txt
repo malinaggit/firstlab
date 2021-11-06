@@ -1,0 +1,55 @@
+AR2、4无法建立EBGP邻居，请列出可能存在的原因
+第二种问法，邻居状态异常，需要写出排查步骤：
+
+第一种问法：
+a、若采用直连建立ebgp邻居，要求直连互通，需要测试R2\4直连是否互通
+b、在bgp配置中，对应的邻居as号是否配置zhengque
+c、R2\4的bgp  route id是否冲突（需要route id不同）
+d、两端是否配置了认证，认证方式和认证密钥是否正确
+e、若采用环回口建立ebgp邻居，则需要使用ping  -a local  remote 测试环回口是否互通
+f、若采用环回口建立ebgp邻居，是否配置了指定更新源
+g、bgp配置中是否针对邻居配置了peer-ignore
+
+
+第二种问法：
+A、当R2\4采用直连建立ebgp邻居时，排查思路如下：
+a、使用命令display bgp  peer查看当前bgp状态，通过bgp状态机初步确认故障区间：若bgp状态停留在idle状态，则查看
+是否配置了peer-ignore；若为connect状态，则考虑邻居两端ip层面是否可达，tcp能否正常建立，可以使用ping x.x.x.x命令测试
+b、使用命令display tcp status查看设备tcp179端口是否处于监听状态
+c、使用命令display bgp  error查看bgp报错信息，根据报错信息初步定为故障区间，然后具体排查故障原因
+查看是否有route id冲突告警，是否有认证告警等
+d、进入bgp协议视图，使用命令display this查看当前配置，排查是否是因为基础配置未配、错误导致邻居关系建立异常
+
+B、当R2、4采用环回口建立ebgp邻居时，排查思路如下：
+a、使用命令display bgp  peer。。。。。使用命令display ip routing-table查看是否具有对端环回口路由，使用命令ping -a x.x.x.x  x.x.x.x
+测试邻居两端是否可达
+b、
+c、
+d、
+
+
+
+如何控制10.1.1.1路径为AR2----->AR3
+
+a、可以在R2出向配置针对R4邻居med策略，具体配置参数如下：
+acl 2000 
+r p s 10.1.1.1 0
+
+route-policy med p n 10 
+if  acl 2000
+app  cost 100
+
+bgp x
+peer x.x.x.x route-policy med export  （x.x.x.x表示和R4建立邻居的对端的地址）
+
+b、可以在R2出向配置针对R4邻居的as-path策略，具体配置参数如下
+acl 2000
+ r p s 10.1.1.1 0
+
+route-policy as-path p n 10
+if  acl 2000
+app  as- add xxx （xxx为as号）
+
+bgp x
+peer   export
+
