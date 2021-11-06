@@ -1,0 +1,45 @@
+园区网中部分终端无法访问网关，有大量arp表项翻动 ，网络中还存在地址为169.254.x.x，请分析。
+a、网络中可能存在arp泛洪攻击，通常网络设备中arp表项是有规格限制的，攻击者就利用这一点，
+不断向网络中设备发送arp请求报文，将设备arp表项资源消耗殆尽，使得设备无法处理正常用户的arp报文，
+最终导致网络访问异常；
+可以查看设备中arp表项是否已满，并且开启arp限速arp speed-limit source-ip maximum xxx和arp严格学习arp learning strict force-enable
+
+b、网络中可能存在arp扫描攻击，攻击者不断向设备发送同网段或跨网段的arp扫描请求信息，当设备没有
+相关arp映射时，arp模块会向上层软件发送arp Miss消息，要求上层软件发送arp请求报文获取相应的mac地址信息，
+在这一过程中，发送arp miss信息会消耗设备CPU资源，达到一定量级后，使得设备无法正常处理用户的arp信息，
+最终导致网络异常；首先查看设备CPU资源具体情况，另外可以在设备中开启terminal monitor，terminal logging（默认开启），
+查看是否有“arp attached miss”告警，若有则需要开启arp限速和arp接口最大限制
+
+c、网络中可能存在arp欺骗攻击，欺骗指恶意用户通过发送伪造的ARP报文，恶意修改网关或网络内其他主机的ARP表项，造成用户或网络的报文转发异常；
+可以查看设备是否具有arp flapping，若存在arp漂移，则开启arp严格学习：arp learning strict force-enable 配置arp报文合法性检测：arp validate source-mac destination-mac
+
+d、网络中可能存在dhcp报文泛洪攻击，当交换机做为DHCP服务器或者中继角色时，攻击者通过不断向dhcp服务器发送dhcp报文，消耗dhcp server对于dhcp报文处理能力，
+当达到一定量级后，dhcp server无法正常处理合法用户的dhcp报文，导致用户无法获取IP地址或者无法续租等情况，最终导致网络故障。
+可以开启dhcp snooping 功能，开启dhcp snooping check dhcp-rate enable限制dhcp报文速率
+配置dhcp端口级防护和用户级防护
+
+e、网络中可能存在dhcp饿死攻击，若在网络中存在DHCP用户恶意申请IP地址，将会导致IP地址池中的IP地址快速耗尽以致DHCP Server无法为其他合法用户分配IP地址。另一方面，
+DHCP Server通常仅根据CHADDR（client hardware address）字段来确认客户端的MAC地址。如果攻击者通过不断改变DHCP Request报文中的CHADDR字段向DHCP Server申请IP地址，
+将会导致DHCP Server上的地址池被耗尽，从而无法为其他正常用户提供IP地址。；可以在设备中开启dhcp snooping功能，使能对报文的CHADDR字段进行检查功能：dhcp snooping check dhcp-chaddr enable
+
+
+f、网络中可能存在dhcp报文仿冒攻击，攻击者不断向dhcp server发送dhcp请求报文，这会使得一些在处理过期状态的IP地址无法正常回收，
+另外也会导致其他合法用户无法获取ip地址，最终导致网络异常；可以使用dhcp snooping功能，开启DHCP报文进行绑定表匹配检查的功能：
+dhcp snooping check dhcp-request enable， dhcp snooping check dhcp-chaddr enable 
+
+g、网络中可能存在dhcp server仿冒攻击，由于dhcp获取IP地址这一过程是在二层进行的，且没有认证机制，采用广播方式获取ip地址，攻击者就利用这一点，
+若攻击者先于dhcp server向客户端发送具有错误IP地址、网关、dns等信息的dhcp offer报文，则会导致用户获取错误的IP地址和网关信息，
+到达DOS的效果；可以在客户端使用ipconfig或ifconfig查看IP地址和网关信息，若不在规划内，则判断存在server仿冒攻击，可以开启dhcp
+snooping功能，配置trust接口，信任dhcp server所在的接口，防范该类攻击
+
+
+
+园区网需要防止有线非法接入，请提供可行性方案
+可以在当前网络环境中做NAC network access control，这是一种端到端的安全认证，包含web认证、802.1x、mac认证等。
+a、对于内部用户，可以基于dot1.x结合aaa服务器来做客户端认证和接入控制，对于强安全网络，可以使用基于端口的认证；这种认证方式
+要求客户端安装dot1.x认证软件
+b、对于一些无法安装认证软件的哑终端，如打印机，传真机等，可以使用aaa认证结合Mac认证的方式做接入控制
+c、对于外部访客，可以使用protal认证的方式，访客可以使用浏览器做接入控制
+另外可以使用以下方式，确保接入用户的安全性
+a、可以在设备中开启dhcp snooping 功能，基于基本监听功能所创建的dhcp snoop监听表项，开启ipsg，dai
+b、可以在接入设备中各端口配置端口安全，限制最大合法用户数量
